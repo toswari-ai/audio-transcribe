@@ -14,7 +14,9 @@ echo -e "${GREEN}🎙️ Starting Audio Transcription App${NC}"
 # Load environment variables from .env file
 if [ -f ".env" ]; then
     echo -e "${GREEN}Loading environment variables from .env file...${NC}"
-    export $(cat .env | grep -v '^#' | xargs)
+    set -a
+    source .env
+    set +a
 else
     echo -e "${YELLOW}Warning: .env file not found. Using default values.${NC}"
 fi

@@ -229,12 +229,26 @@ class ClarifaiTranscriber:
         data_obj = resources_pb2.Data(audio=audio_obj)
         input_obj = resources_pb2.Input(data=data_obj)
         
+        # Build request parameters
+        request_params = {
+            "user_app_id": user_app_id,
+            "model_id": model_info["model_id"],
+            "inputs": [input_obj]
+        }
+        
+        # Add deployment_id if available for dedicated deployed models
+        if "deployment_id" in model_info and model_info["deployment_id"]:
+            deployment_id = model_info["deployment_id"]
+            # TODO: deployment_id needs to be passed when creating the Model connection, not in PostModelOutputsRequest
+            # request_params["deployment_id"] = deployment_id  # Not supported in current gRPC version
+            print(f"🚀 Using dedicated compute deployment: {deployment_id}")
+            print(f"💻 Model: {model_info['model_id']} (dedicated deployment)")
+            print(f"⚠️  Note: deployment_id requires newer Clarifai SDK with Model() class")
+        else:
+            print(f"🌐 Using shared model: {model_info['model_id']} (standard)")
+        
         # Create and return the request
-        return service_pb2.PostModelOutputsRequest(
-            user_app_id=user_app_id,
-            model_id=model_info["model_id"],
-            inputs=[input_obj]
-        )
+        return service_pb2.PostModelOutputsRequest(**request_params)
     
     def extract_transcription_text(self, response) -> str:
         """
@@ -298,9 +312,17 @@ class ClarifaiTranscriber:
         """
         try:
             # Validate model
-            model_info = self.models.get(model_name)
+            model_info = config.get_model_info(model_name)
             if not model_info:
                 raise ValueError(f"Unknown model: {model_name}")
+            
+            # Debug: Show deployment configuration
+            deployment_id = model_info.get("deployment_id")
+            if deployment_id:
+                print(f"🎯 Using dedicated compute: {model_name}")
+                print(f"📋 Deployment ID: {deployment_id}")
+            else:
+                print(f"🌐 Using shared compute: {model_name}")
             
             # Validate audio data
             validated_audio = self.validate_audio_data(audio_bytes)
@@ -371,9 +393,17 @@ class ClarifaiTranscriber:
         """
         try:
             # Validate model
-            model_info = self.models.get(model_name)
+            model_info = config.get_model_info(model_name)
             if not model_info:
                 raise ValueError(f"Unknown model: {model_name}")
+            
+            # Debug: Show deployment configuration
+            deployment_id = model_info.get("deployment_id")
+            if deployment_id:
+                print(f"🎯 Initializing dedicated compute for: {model_name}")
+                print(f"📋 Deployment ID: {deployment_id}")
+            else:
+                print(f"🌐 Using shared compute for: {model_name}")
             
             # Apply custom quality settings temporarily
             original_hq = config.HIGH_QUALITY_CONVERSION

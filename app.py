@@ -1,4 +1,6 @@
 import streamlit as st
+import time
+import io
 from config import config
 from ClarifaiUtil import ClarifaiTranscriber
 
@@ -11,6 +13,20 @@ st.set_page_config(
 
 def main():
     """Main Streamlit application"""
+    
+    # Clear any stale audio references on app start
+    if hasattr(st.session_state, 'converted_wav'):
+        # Check if audio timestamp exists and is recent
+        audio_timestamp = getattr(st.session_state, 'audio_timestamp', 0)
+        audio_age = time.time() - audio_timestamp
+        if audio_age > 600:  # Older than 10 minutes
+            # Clear stale audio references
+            if hasattr(st.session_state, 'converted_wav'):
+                del st.session_state.converted_wav
+            if hasattr(st.session_state, 'audio_timestamp'):
+                del st.session_state.audio_timestamp
+            # Optionally show a brief info message (but don't persist it)
+            st.toast("🧹 Cleaned up expired audio files", icon="ℹ️")
     
     # Validate configuration
     config_errors = config.validate_config()
@@ -26,6 +42,12 @@ def main():
     
     st.title(f"{config.APP_ICON} {config.APP_TITLE}")
     st.markdown("Upload an audio file and transcribe it using Clarifai's speech-to-text models.")
+    
+    # Debug: Add option to clear session state if experiencing issues
+    if st.sidebar.button("🔧 Clear All Data", help="Clear all session data if experiencing audio playback issues"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
     
     # Check if PAT is configured
     if not config.CLARIFAI_PAT:
@@ -185,6 +207,9 @@ def main():
                         
                         # Perform transcription with enhanced quality settings
                         try:
+                            # Start timing the Clarifai API call
+                            start_time = time.time()
+                            
                             transcription, converted_wav = transcriber.transcribe_audio_with_wav(
                                 audio_bytes, 
                                 model_name, 
@@ -196,13 +221,19 @@ def main():
                                 trim_silence=trim_silence
                             )
                             
+                            # Calculate API call duration
+                            end_time = time.time()
+                            api_duration = end_time - start_time
+                            
                             # Store result in session state
                             if transcription:
                                 st.session_state.transcription = transcription
                                 st.session_state.model_used = model_name
                                 st.session_state.converted_wav = converted_wav  # Store converted WAV
                                 st.session_state.original_filename = uploaded_file.name
-                                st.success("Transcription completed!")
+                                st.session_state.api_duration = api_duration  # Store API timing
+                                st.session_state.audio_timestamp = time.time()  # Track when audio was created
+                                st.success(f"Transcription completed in {api_duration:.2f} seconds!")
                             else:
                                 st.error("Transcription returned empty result.")
                                 
@@ -224,8 +255,26 @@ def main():
                     st.subheader("🎵 Converted Audio (WAV)")
                     st.caption("This is the processed audio that was sent to the AI model")
                     
-                    # Play the converted WAV file
-                    st.audio(st.session_state.converted_wav, format="audio/wav")
+                    # Check if audio is recent (within last 10 minutes to avoid stale references)
+                    audio_age = time.time() - getattr(st.session_state, 'audio_timestamp', 0)
+                    
+                    if audio_age < 600:  # 10 minutes
+                        # Play the converted WAV file with error handling
+                        try:
+                            # Create a fresh BytesIO object for audio playback
+                            audio_buffer = io.BytesIO(st.session_state.converted_wav)
+                            st.audio(audio_buffer, format="audio/wav")
+                        except Exception as e:
+                            st.warning("Audio playback temporarily unavailable. You can still download the converted WAV file below.")
+                            st.caption(f"Audio playback error: {str(e)}")
+                            
+                            # Provide refresh option
+                            if st.button("🔄 Refresh Audio", help="Reset audio player"):
+                                st.session_state.audio_timestamp = time.time()
+                                st.rerun()
+                    else:
+                        st.warning("Audio playback expired for performance reasons. You can still download the converted WAV file below.")
+                        st.caption("Re-run transcription to enable audio playback again.")
                     
                     # Show audio info
                     original_name = getattr(st.session_state, 'original_filename', 'unknown')
@@ -252,13 +301,26 @@ def main():
                     help="You can copy the transcribed text from here"
                 )
                 
-                # Download button for transcription
-                st.download_button(
-                    label="📥 Download Transcription",
-                    data=st.session_state.transcription,
-                    file_name=f"transcription_{st.session_state.model_used.lower().replace(' ', '_')}.txt",
-                    mime="text/plain"
-                )
+                # Download button and timing info in columns
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    # Download button for transcription
+                    st.download_button(
+                        label="📥 Download Transcription",
+                        data=st.session_state.transcription,
+                        file_name=f"transcription_{st.session_state.model_used.lower().replace(' ', '_')}.txt",
+                        mime="text/plain"
+                    )
+                
+                with col2:
+                    # Display API call timing
+                    if hasattr(st.session_state, 'api_duration'):
+                        st.metric(
+                            label="⏱️ API Time",
+                            value=f"{st.session_state.api_duration:.2f}s",
+                            help="Time taken for the Clarifai API call"
+                        )
                 
                 # Clear button
                 if st.button("🗑️ Clear Result"):
@@ -268,6 +330,10 @@ def main():
                         del st.session_state.converted_wav
                     if hasattr(st.session_state, 'original_filename'):
                         del st.session_state.original_filename
+                    if hasattr(st.session_state, 'api_duration'):
+                        del st.session_state.api_duration
+                    if hasattr(st.session_state, 'audio_timestamp'):
+                        del st.session_state.audio_timestamp
                     st.rerun()
             else:
                 st.info("Upload an audio file and click 'Transcribe Audio' to see results here.")

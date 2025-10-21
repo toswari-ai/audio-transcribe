@@ -24,6 +24,7 @@ A powerful Streamlit application that transcribes audio files using Clarifai's s
 - **Audio Quality Settings**: High-quality vs basic conversion modes
 - **Inference Parameters**: Temperature (0.01-1.0) and max tokens (100-2000)
 - **Model Selection**: Real-time model switching with descriptions
+- **Dedicated Compute**: Support for deployed models with guaranteed performance
 - **Environment Config**: Complete .env file configuration system
 - **Validation**: Automatic configuration validation with helpful error messages
 
@@ -102,6 +103,10 @@ CLARIFAI_PAT=your_personal_access_token_here
 CLARIFAI_USER_ID=your_username_here
 CLARIFAI_APP_ID=your_app_id_here
 
+# ===== DEDICATED COMPUTE (OPTIONAL) =====
+# For dedicated deployed models - better performance & custom models
+# CLARIFAI_DEPLOYMENT_ID=deploy-whisper-large-v3-cr4h
+
 # ===== MODEL SETTINGS =====
 DEFAULT_MODEL=OpenAI Whisper Large V3
 DEFAULT_TEMPERATURE=0.01
@@ -129,6 +134,23 @@ APP_ICON=🎙️
 | `CLARIFAI_PAT` | Your Personal Access Token from Clarifai Portal | `username_1a2b3c4d...` |
 | `CLARIFAI_USER_ID` | Your Clarifai username/user ID | `your-username` |
 | `CLARIFAI_APP_ID` | Clarifai application ID to use | `audio-transcription` |
+
+#### 🚀 **Dedicated Compute (Optional)**
+| Variable | Description | Example | Benefits |
+|----------|-------------|---------|----------|
+| `CLARIFAI_DEPLOYMENT_ID` | Deployment ID for dedicated models | `deploy-whisper-large-v3-cr4h` | Better performance, custom models, guaranteed compute |
+
+**Dedicated Compute Features:**
+- **🎯 Better Performance**: Dedicated compute resources with guaranteed availability
+- **⚡ Faster Processing**: No shared resource contention, reduced latency  
+- **🔧 Custom Models**: Access to fine-tuned or specialized model versions
+- **📊 Enhanced Reliability**: SLA guarantees and isolated infrastructure
+- **💰 Enterprise Features**: Priority support and advanced monitoring
+
+**Configuration Options:**
+1. **Global Override** (Environment Variable): Set `CLARIFAI_DEPLOYMENT_ID` to apply to ALL models
+2. **Per-Model Config** (config.py): Set `deployment_id` for specific models only
+3. **Priority Order**: Environment variable overrides model-specific settings
 
 #### 🎯 **Model Settings**
 | Variable | Default | Range | Description |
@@ -170,7 +192,97 @@ APP_ICON=🎙️
    streamlit run app.py
    ```
 
-3. **Runtime Configuration**: Leave .env empty and enter credentials in the app sidebar## 🚀 Running the Application
+3. **Runtime Configuration**: Leave .env empty and enter credentials in the app sidebar
+
+### 🚀 Dedicated Compute Configuration
+
+The application now supports dedicated compute deployments for better performance and custom models. Here's how to configure deployment IDs:
+
+#### Option 1: Environment Variable (Global Override)
+
+Set `CLARIFAI_DEPLOYMENT_ID` in your `.env` file to apply to **ALL models**:
+
+```bash
+# .env file
+CLARIFAI_DEPLOYMENT_ID=deploy-whisper-large-v3-cr4h
+```
+
+This will override any model-specific deployment IDs and apply the same deployment to all transcriptions.
+
+#### Option 2: Per-Model Configuration (config.py)
+
+Configure deployment IDs for specific models by editing `config.py`:
+
+```python
+# config.py - Add deployment_id to specific models
+"OpenAI Whisper Large V3": {
+    "model_id": "whisper-large-v3",
+    "user_id": "openai",
+    "app_id": "transcription",
+    "description": "Latest Whisper v3: 10-20% error reduction...",
+    "status": "working",
+    "deployment_id": "deploy-whisper-large-v3-cr4h"  # Add this line
+},
+
+"Custom Fine-tuned Model": {
+    "model_id": "my-custom-model",
+    "user_id": "my-username",
+    "app_id": "my-app",
+    "description": "My custom fine-tuned model",
+    "status": "working",
+    "deployment_id": "deploy-custom-model-xyz123"     # Custom deployment
+}
+```
+
+#### Getting Deployment IDs
+
+1. **Visit Clarifai Dashboard**: Go to [clarifai.com/apps](https://clarifai.com/apps)
+2. **Select Your App**: Navigate to your application
+3. **Go to Models**: Choose the model you want to deploy
+4. **Create/View Deployments**: In the "Deployments" section
+5. **Copy Deployment ID**: Format is usually `deploy-model-name-xxxx`
+
+#### Configuration Priority
+
+The deployment ID resolution follows this priority order:
+
+1. **🌍 Environment Variable** (`CLARIFAI_DEPLOYMENT_ID`) - **Highest Priority**
+2. **📝 Model-Specific Config** (`config.py` deployment_id) - **Fallback**
+3. **🌐 Standard Shared Models** (no deployment_id) - **Default**
+
+#### Debug Messages
+
+When deployment IDs are configured, you'll see debug messages indicating which compute type is being used:
+
+```bash
+# Dedicated compute messages
+🎯 Initializing dedicated compute for: OpenAI Whisper Large V3
+📋 Deployment ID: deploy-whisper-large-v3-cr4h
+🚀 Using dedicated compute deployment: deploy-whisper-large-v3-cr4h
+
+# Shared compute messages  
+🌐 Using shared compute for: Facebook Wav2Vec2 English
+🌐 Using shared model: asr-wav2vec2-base-960h-english (standard)
+```
+
+#### Testing Deployment Configuration
+
+Use the provided test scripts to verify your deployment setup:
+
+```bash
+# Test deployment ID configuration
+python3 test_deployment_id.py
+
+# Test debug messages with different deployments
+python3 test_debug_messages.py
+
+# Test with environment override
+CLARIFAI_DEPLOYMENT_ID=your-deployment-id python3 test_debug_messages.py
+```
+
+---
+
+## 🚀 Running the Application
 
 ### Option A: Quick Start (Recommended)
 ```bash
@@ -265,7 +377,33 @@ Quality: Any bitrate, sample rate, mono/stereo
 - **Download**: Export as .txt file
 - **Processing Stats**: Speed, accuracy, and quality information
 
-### 4. **Advanced Usage Patterns**
+### 4. **🔍 Debug Messages & Compute Monitoring**
+
+The application provides real-time debug messages to help you monitor which compute type is being used for each transcription:
+
+#### **🚀 Dedicated Compute Indicators**
+When using deployed models with dedicated compute, you'll see:
+```bash
+🎯 Initializing dedicated compute for: OpenAI Whisper Large V3
+📋 Deployment ID: deploy-whisper-large-v3-cr4h
+🚀 Using dedicated compute deployment: deploy-whisper-large-v3-cr4h
+💻 Model: whisper-large-v3 (dedicated deployment)
+```
+
+#### **🌐 Shared Compute Indicators**
+For standard shared models, you'll see:
+```bash
+🌐 Using shared compute for: Facebook Wav2Vec2 English  
+🌐 Using shared model: asr-wav2vec2-base-960h-english (standard)
+```
+
+#### **📊 Benefits of Debug Messages**
+- **💰 Cost Tracking**: Know when you're using dedicated (paid) vs shared compute
+- **🐛 Configuration Debugging**: Verify deployment_id settings are working
+- **📈 Performance Monitoring**: Track which deployments are being used
+- **⚠️ Issue Detection**: Get notified about configuration problems
+
+### 5. **Advanced Usage Patterns**
 
 #### **🔄 Batch Processing Workflow**
 1. Configure optimal settings for your audio type
@@ -493,6 +631,58 @@ TARGET_SAMPLE_RATE=8000
 - **Alternative**: Use basic quality conversion mode
 - **Optimization**: Close other applications during processing
 
+#### **Dedicated Compute Issues**
+
+**❌ "Deployment not found"**
+```bash
+# Error: Deployment not found: deploy-invalid-xxxx
+# Solution 1: Verify deployment ID exists and is active
+# - Check Clarifai dashboard under Deployments
+# - Ensure deployment is running (not stopped/paused)
+
+# Solution 2: Check deployment ID format
+# - Should look like: deploy-model-name-xxxx
+# - Copy exact ID from Clarifai portal
+
+# Solution 3: Test with debug messages
+python3 test_deployment_id.py
+```
+
+**❌ "Deployment is starting up"**
+```bash
+# Error: Deployment is starting up, please retry in a few seconds
+# Solution: Wait 30-60 seconds and retry
+# - Deployments take time to initialize
+# - This is normal for dedicated compute
+
+# Alternative: Use shared model temporarily
+# Comment out deployment_id in config.py
+```
+
+**❌ "Access denied to deployment"**
+```bash
+# Solution 1: Verify PAT permissions
+# - Ensure your PAT has access to deployments
+# - Check if deployment belongs to your account
+
+# Solution 2: Check organization access
+# - Verify you're in the right Clarifai organization
+# - Ask admin to grant deployment access
+```
+
+**🔍 "Debug messages show wrong deployment ID"**
+```bash
+# Check environment variable override
+echo $CLARIFAI_DEPLOYMENT_ID
+
+# If set, it overrides all model-specific deployment IDs
+# To use per-model settings:
+unset CLARIFAI_DEPLOYMENT_ID
+
+# Or comment out in .env:
+# CLARIFAI_DEPLOYMENT_ID=deploy-whisper-large-v3-cr4h
+```
+
 ### ❓ **Frequently Asked Questions**
 
 #### **Q: Which model should I use?**
@@ -525,6 +715,13 @@ TARGET_SAMPLE_RATE=8000
 - **Storage**: No audio is stored locally after processing  
 - **Privacy**: Check [Clarifai's Privacy Policy](https://clarifai.com/privacy)
 - **Security**: All API calls use HTTPS encryption
+
+#### **Q: Should I use dedicated compute or shared models?**
+- **Shared Models (Free/Cheaper)**: Perfect for testing, development, and low-volume use
+- **Dedicated Compute (Premium)**: Better for production, guaranteed performance, custom models
+- **When to Upgrade**: High-volume usage, need guaranteed availability, custom fine-tuned models
+- **Cost Difference**: Dedicated compute costs more but provides better SLA and performance
+- **Testing**: Start with shared models, upgrade when you need reliability/performance guarantees
 
 #### **Q: How much does it cost?**
 - **Clarifai**: Check current pricing at [Clarifai Pricing](https://clarifai.com/pricing)

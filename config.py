@@ -19,6 +19,7 @@ class Config:
         self.CLARIFAI_API_KEY = self.CLARIFAI_PAT  # Backwards compatibility
         self.CLARIFAI_USER_ID = os.getenv("CLARIFAI_USER_ID") 
         self.CLARIFAI_APP_ID = os.getenv("CLARIFAI_APP_ID")
+        self.CLARIFAI_DEPLOYMENT_ID = os.getenv("CLARIFAI_DEPLOYMENT_ID")  # For dedicated deployed models
         
         # App Configuration
         self.APP_TITLE = os.getenv("APP_TITLE", "Audio Transcription with Clarifai")
@@ -59,15 +60,18 @@ class Config:
             "OpenAI Whisper Large V3": {
                 "model_id": "whisper-large-v3",
                 "user_id": "openai",
-                "app_id": "whisper",
-                "description": "Latest Whisper with 10-20% error reduction (6⭐) - ✅ Most Accurate",
-                "status": "working"
+                "app_id": "transcription",
+                "description": "Latest Whisper v3: 10-20% error reduction, 5M hours training data, 128 Mel bins, multilingual with Cantonese support - ✅ Most Accurate",
+                "status": "working",
+                "pricing": "$0.0012/request",
+                "features": ["dedicated compute","streaming","multilingual", "speech_translation", "cantonese_support", "improved_accuracy"],
+                "deployment_id": "deploy-whisper-large-v3-cr4h"  # For dedicated deployed models - remove for shared model
             },
             "OpenAI Whisper Large V2": {
                 "model_id": "whisper-large-v2",
                 "user_id": "openai", 
-                "app_id": "whisper",
-                "description": "High accuracy multilingual transcription (13⭐) - ✅ Now working with WAV conversion",
+                "app_id": "transcription",
+                "description": "High accuracy multilingual transcription, predecessor to v3 - ✅ Working with WAV conversion",
                 "status": "working"
             },
             "Deepgram Nova-2": {
@@ -127,8 +131,14 @@ class Config:
         return errors
     
     def get_model_info(self, model_name: str) -> Dict[str, Any]:
-        """Get model configuration by name"""
-        return self.AVAILABLE_MODELS.get(model_name, {})
+        """Get model configuration by name with deployment_id override support"""
+        model_info = self.AVAILABLE_MODELS.get(model_name, {}).copy()
+        
+        # Override deployment_id with environment variable if set
+        if self.CLARIFAI_DEPLOYMENT_ID:
+            model_info["deployment_id"] = self.CLARIFAI_DEPLOYMENT_ID
+            
+        return model_info
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary"""
