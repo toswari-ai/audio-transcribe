@@ -1,0 +1,24 @@
+# Streamlit configuration file
+# This file is automatically read by Streamlit
+
+[server]
+# Server settings from environment variables
+port = 8501
+address = "localhost"
+enableCORS = true
+enableXsrfProtection = true
+
+[browser]
+# Browser settings
+gatherUsageStats = false
+
+[theme]
+# Theme configuration
+primaryColor = "#FF6B6B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[logger]
+# Logging configuration
+level = "info"
