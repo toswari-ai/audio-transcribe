@@ -5,11 +5,21 @@ Contains all Clarifai-specific API calls and data handling
 
 import base64
 import io
-from typing import Optional, Dict, Any
+import os
+import time
+from typing import Optional, Dict, Any, Generator, Iterator
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
 from clarifai_grpc.grpc.api.status import status_code_pb2
 from config import config
+
+# OpenAI client for streaming functionality
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    OpenAI = None
 
 # Audio processing imports
 try:
@@ -940,6 +950,373 @@ class ClarifaiTranscriber:
             raise Exception(f"Advanced transcription failed: {str(e)}")
 
 
+class ClarifaiOpenAIStreamer:
+    """
+    Streaming client for Clarifai transcription with chunk-based processing
+    Provides streaming-like interface using Clarifai's gRPC API
+    """
+    
+    def __init__(self, api_key: Optional[str] = None):
+        """
+        Initialize the streaming client for Clarifai
+        
+        Args:
+            api_key: Clarifai PAT. If None, uses config.CLARIFAI_API_KEY
+        """
+        self.api_key = api_key or config.CLARIFAI_API_KEY
+        if not self.api_key:
+            raise ValueError("Clarifai API key is required for streaming")
+        
+        # Initialize gRPC components
+        self.channel = ClarifaiChannel.get_grpc_channel()
+        self.stub = service_pb2_grpc.V2Stub(self.channel)
+        
+        # Keep OpenAI client for potential future use
+        if OPENAI_AVAILABLE:
+            self.client = OpenAI(
+                base_url="https://api.clarifai.com/v2/ext/openai/v1",
+                api_key=self.api_key
+            )
+        
+        # Use models from config
+        self.models = config.AVAILABLE_MODELS
+    
+    def get_streaming_model_url(self, model_name: str) -> str:
+        """
+        Convert internal model name to Clarifai OpenAI-compatible model URL
+        
+        Args:
+            model_name: Internal model name from config
+            
+        Returns:
+            Model identifier for Clarifai's OpenAI API
+            
+        Raises:
+            ValueError: If model is not found or not streaming-compatible
+        """
+        model_info = config.get_model_info(model_name)
+        if not model_info:
+            raise ValueError(f"Unknown model: {model_name}")
+        
+        # For OpenAI Whisper models, we can use streaming
+        if "whisper" in model_name.lower():
+            user_id = model_info["user_id"]
+            app_id = model_info["app_id"]
+            model_id = model_info["model_id"]
+            
+            # Based on Clarifai OpenAI docs, try the short format first
+            # This matches the format used in the documentation examples
+            return f"{user_id}/{app_id}/models/{model_id}"
+        else:
+            raise ValueError(f"Model {model_name} does not support streaming yet")
+    
+    def chunk_audio_for_streaming(
+        self, 
+        audio_bytes: bytes, 
+        chunk_duration_ms: int = 5000,
+        high_quality_conversion: bool = False,
+        target_sample_rate: int = 16000
+    ) -> Iterator[bytes]:
+        """
+        Split audio into chunks for streaming processing with optional preprocessing
+        
+        Args:
+            audio_bytes: Original audio data
+            chunk_duration_ms: Duration of each chunk in milliseconds
+            high_quality_conversion: Apply audio enhancement before chunking
+            target_sample_rate: Target sample rate for processing
+            
+        Yields:
+            Audio chunk as bytes (preprocessed if high_quality_conversion=True)
+        """
+        if not AUDIO_CONVERSION_AVAILABLE:
+            # If pydub not available, yield entire audio as single chunk
+            yield audio_bytes
+            return
+        
+        try:
+            # Load audio once
+            audio_io = io.BytesIO(audio_bytes)
+            audio_segment = AudioSegment.from_file(audio_io)
+            
+            # Apply preprocessing if high quality conversion is enabled
+            if high_quality_conversion:
+                print(f"🎛️ Preprocessing audio for streaming (target: {target_sample_rate}Hz)")
+                
+                # Convert to mono and resample
+                if audio_segment.channels > 1:
+                    audio_segment = audio_segment.set_channels(1)
+                    print("🔊 Converted to mono for streaming")
+                
+                if audio_segment.frame_rate != target_sample_rate:
+                    audio_segment = audio_segment.set_frame_rate(target_sample_rate)
+                    print(f"📊 Resampled to {target_sample_rate}Hz for streaming")
+            
+            # Calculate chunk size
+            total_duration = len(audio_segment)
+            
+            if total_duration <= chunk_duration_ms:
+                # Audio is smaller than chunk size, return as single chunk
+                chunk_io = io.BytesIO()
+                audio_segment.export(chunk_io, format="wav")
+                yield chunk_io.getvalue()
+                return
+            
+            # Split into chunks and yield immediately (memory efficient)
+            for start in range(0, total_duration, chunk_duration_ms):
+                end = min(start + chunk_duration_ms, total_duration)
+                chunk = audio_segment[start:end]
+                
+                # Export chunk to bytes and yield immediately
+                chunk_io = io.BytesIO()
+                chunk.export(chunk_io, format="wav")
+                yield chunk_io.getvalue()
+                
+        except Exception as e:
+            print(f"⚠️ Audio chunking failed: {e}. Using full audio.")
+            yield audio_bytes
+    
+    def transcribe_streaming(
+        self,
+        audio_bytes: bytes,
+        model_name: str = "OpenAI Whisper Large V3",
+        chunk_duration_ms: int = 5000,
+        temperature: float = 0.01,
+        language: Optional[str] = None,
+        enable_audio_analysis: bool = False,
+        high_quality_conversion: bool = False,
+        target_sample_rate: int = 16000
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Transcribe audio with streaming output
+        
+        Args:
+            audio_bytes: Audio data as bytes
+            model_name: Name of the model to use
+            chunk_duration_ms: Size of audio chunks in milliseconds
+            temperature: Temperature for transcription
+            language: Language code (optional)
+            enable_audio_analysis: Analyze audio quality for each chunk
+            high_quality_conversion: Apply audio enhancement to chunks
+            target_sample_rate: Target sample rate for processing
+            
+        Yields:
+            Dictionary with streaming results: {
+                "chunk_index": int,
+                "text": str,
+                "is_final": bool,
+                "timestamp": float,
+                "chunk_duration": float,
+                "audio_analysis": dict (if enabled)
+            }
+        """
+        try:
+            model_url = self.get_streaming_model_url(model_name)
+            print(f"🎙️ Starting streaming transcription with {model_name}")
+            print(f"📊 Chunk size: {chunk_duration_ms}ms")
+            
+            chunk_index = 0
+            total_text = ""
+            audio_analysis_results = []
+            
+            # Process audio in chunks with integrated preprocessing
+            for chunk_bytes in self.chunk_audio_for_streaming(
+                audio_bytes, 
+                chunk_duration_ms,
+                high_quality_conversion=high_quality_conversion,
+                target_sample_rate=target_sample_rate
+            ):
+                start_time = time.time()
+                chunk_analysis = None
+                
+                # Analyze chunk quality if enabled
+                if enable_audio_analysis and AUDIO_CONVERSION_AVAILABLE:
+                    try:
+                        # Quick analysis of chunk (simplified for performance)
+                        chunk_io = io.BytesIO(chunk_bytes)
+                        chunk_segment = AudioSegment.from_file(chunk_io)
+                        
+                        chunk_analysis = {
+                            "duration_ms": len(chunk_segment),
+                            "sample_rate": chunk_segment.frame_rate,
+                            "channels": chunk_segment.channels,
+                            "size_kb": len(chunk_bytes) / 1024
+                        }
+                        audio_analysis_results.append(chunk_analysis)
+                    except:
+                        chunk_analysis = None
+                
+                try:
+                    # Use Clarifai gRPC API directly for streaming (OpenAI audio endpoint not available)
+                    print(f"🔍 Processing chunk {chunk_index} with Clarifai gRPC API")
+                    
+                    # Get model info for gRPC API
+                    model_info = config.get_model_info(model_name)
+                    if not model_info:
+                        raise ValueError(f"Model {model_name} not found in config")
+                    
+                    # Create the gRPC request for this chunk
+                    user_app_id = resources_pb2.UserAppIDSet(
+                        user_id=model_info["user_id"],
+                        app_id=model_info["app_id"]
+                    )
+                    
+                    # Create audio object with chunk bytes
+                    audio_obj = resources_pb2.Audio(base64=chunk_bytes)
+                    data_obj = resources_pb2.Data(audio=audio_obj)
+                    input_obj = resources_pb2.Input(data=data_obj)
+                    
+                    # Create model object
+                    model_obj = resources_pb2.Model(
+                        id=model_info["model_id"],
+                        model_version=resources_pb2.ModelVersion(id="")
+                    )
+                    
+                    # Build request
+                    request = service_pb2.PostModelOutputsRequest(
+                        user_app_id=user_app_id,
+                        model_id=model_info["model_id"],
+                        inputs=[input_obj],
+                        model=model_obj
+                    )
+                    
+                    # Make API call
+                    metadata = (('authorization', 'Key ' + self.api_key),)
+                    response = self.stub.PostModelOutputs(request, metadata=metadata)
+                    
+                    # Extract text from response
+                    chunk_text = ""
+                    if response.status.code == status_code_pb2.SUCCESS:
+                        if response.outputs and len(response.outputs) > 0:
+                            output = response.outputs[0]
+                            if hasattr(output.data, 'text') and output.data.text:
+                                chunk_text = output.data.text.raw.strip()
+                    else:
+                        raise Exception(f"Clarifai API error: {response.status.description}")
+                    
+                    processing_time = time.time() - start_time
+                    
+                    if chunk_text:
+                        total_text += " " + chunk_text if total_text else chunk_text
+                    
+                    result = {
+                        "chunk_index": chunk_index,
+                        "text": chunk_text,
+                        "cumulative_text": total_text,
+                        "is_final": False,
+                        "timestamp": time.time(),
+                        "processing_time": processing_time,
+                        "chunk_duration": chunk_duration_ms / 1000.0
+                    }
+                    
+                    # Add audio analysis if available
+                    if chunk_analysis:
+                        result["audio_analysis"] = chunk_analysis
+                    
+                    yield result
+                    
+                    chunk_index += 1
+                    
+                except Exception as chunk_error:
+                    print(f"⚠️ Chunk {chunk_index} failed: {chunk_error}")
+                    yield {
+                        "chunk_index": chunk_index,
+                        "text": "",
+                        "cumulative_text": total_text,
+                        "is_final": False,
+                        "timestamp": time.time(),
+                        "processing_time": time.time() - start_time,
+                        "error": str(chunk_error)
+                    }
+                    chunk_index += 1
+            
+            # Final result with overall statistics
+            final_result = {
+                "chunk_index": chunk_index,
+                "text": total_text,
+                "cumulative_text": total_text,
+                "is_final": True,
+                "timestamp": time.time(),
+                "total_chunks": chunk_index
+            }
+            
+            # Add overall audio analysis if enabled
+            if enable_audio_analysis and audio_analysis_results:
+                total_duration = sum(a.get("duration_ms", 0) for a in audio_analysis_results)
+                total_size = sum(a.get("size_kb", 0) for a in audio_analysis_results)
+                
+                final_result["overall_analysis"] = {
+                    "total_audio_duration_ms": total_duration,
+                    "total_audio_size_kb": total_size,
+                    "average_chunk_duration_ms": total_duration / max(len(audio_analysis_results), 1),
+                    "chunks_analyzed": len(audio_analysis_results)
+                }
+            
+            yield final_result
+            
+        except Exception as e:
+            raise Exception(f"Streaming transcription failed: {str(e)}")
+    
+    def transcribe_streaming_realtime(
+        self,
+        audio_bytes: bytes, 
+        model_name: str = "OpenAI Whisper Large V3",
+        progress_callback: Optional[callable] = None,
+        chunk_duration_ms: int = 5000,
+        language: Optional[str] = None,
+        enable_audio_analysis: bool = False,
+        high_quality_conversion: bool = False,
+        target_sample_rate: int = 16000
+    ) -> Dict[str, Any]:
+        """
+        Real-time streaming transcription with progress updates
+        
+        Args:
+            audio_bytes: Audio data as bytes
+            model_name: Model to use for transcription
+            progress_callback: Function to call with progress updates
+            
+        Returns:
+            Complete transcription result with streaming metadata
+        """
+        results = []
+        total_text = ""
+        start_time = time.time()
+        
+        try:
+            for result in self.transcribe_streaming(
+                audio_bytes, 
+                model_name, 
+                chunk_duration_ms=chunk_duration_ms,
+                language=language,
+                enable_audio_analysis=enable_audio_analysis,
+                high_quality_conversion=high_quality_conversion,
+                target_sample_rate=target_sample_rate
+            ):
+                results.append(result)
+                
+                if result.get("text"):
+                    total_text = result["cumulative_text"]
+                
+                # Call progress callback if provided
+                if progress_callback:
+                    progress_callback(result)
+            
+            total_time = time.time() - start_time
+            
+            return {
+                "text": total_text,
+                "streaming_results": results,
+                "total_processing_time": total_time,
+                "total_chunks": len(results) - 1,  # Exclude final result
+                "model_name": model_name,
+                "streaming_enabled": True
+            }
+            
+        except Exception as e:
+            raise Exception(f"Real-time streaming failed: {str(e)}")
+
+
 def create_transcriber(api_key: Optional[str] = None) -> ClarifaiTranscriber:
     """
     Factory function to create a ClarifaiTranscriber instance
@@ -951,6 +1328,32 @@ def create_transcriber(api_key: Optional[str] = None) -> ClarifaiTranscriber:
         Configured ClarifaiTranscriber instance
     """
     return ClarifaiTranscriber(api_key)
+
+
+def create_streaming_transcriber(api_key: Optional[str] = None) -> ClarifaiOpenAIStreamer:
+    """
+    Factory function to create a ClarifaiOpenAIStreamer instance
+    
+    Args:
+        api_key: Optional API key. If None, uses config value
+        
+    Returns:
+        Configured ClarifaiOpenAIStreamer instance
+    
+    Raises:
+        ImportError: If OpenAI client is not available
+    """
+    return ClarifaiOpenAIStreamer(api_key)
+
+
+def is_streaming_available() -> bool:
+    """
+    Check if streaming functionality is available
+    
+    Returns:
+        True if OpenAI client is available for streaming
+    """
+    return OPENAI_AVAILABLE
 
 
 def get_available_models() -> Dict[str, Dict[str, str]]:

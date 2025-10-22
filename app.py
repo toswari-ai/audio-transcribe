@@ -2,7 +2,7 @@ import streamlit as st
 import time
 import io
 from config import config
-from ClarifaiUtil import ClarifaiTranscriber
+from ClarifaiUtil import ClarifaiTranscriber, is_streaming_available
 
 # Page configuration
 st.set_page_config(
@@ -109,20 +109,20 @@ def main():
         
         # API Format Selection
         st.sidebar.subheader("📡 API Format Control")
-        api_format_options = ["wav", "mp3", "flac", "original"]
+        api_format_options = ["original", "wav", "mp3", "flac"]
         api_format = st.sidebar.selectbox(
             "Format to Send to API",
             options=api_format_options,
-            index=0,  # Default to WAV
-            help="Choose which audio format to send to the Clarifai API. WAV is recommended for best results."
+            index=0,  # Default to Original
+            help="Choose which audio format to send to the Clarifai API. Original format preserves user's uploaded audio without conversion."
         )
         
         # Show format info
         format_descriptions = {
+            "original": "📄 No conversion - Uses uploaded format directly (Recommended)",
             "wav": "🎵 Uncompressed PCM - Best quality, larger file",
             "mp3": "🎶 Compressed - Good quality, smaller file", 
-            "flac": "🎼 Lossless compression - High quality, medium file",
-            "original": "📄 No conversion - Uses uploaded format directly"
+            "flac": "🎼 Lossless compression - High quality, medium file"
         }
         st.sidebar.caption(format_descriptions[api_format])
         
@@ -224,6 +224,66 @@ def main():
             gain_db = 0.0
             st.sidebar.caption("💡 Enable for better transcription accuracy")
         
+        # Streaming Configuration
+        st.sidebar.subheader("🌊 Streaming Mode")
+        
+        # Check if streaming is available
+        from ClarifaiUtil import is_streaming_available
+        
+        if is_streaming_available():
+            enable_streaming = st.sidebar.checkbox(
+                "Enable Streaming Transcription",
+                value=False,
+                help="Process audio in real-time chunks for faster initial results"
+            )
+            
+            if enable_streaming:
+                # Streaming parameters
+                st.sidebar.markdown("**Streaming Settings:**")
+                
+                chunk_duration = st.sidebar.selectbox(
+                    "Chunk Duration",
+                    options=[2000, 3000, 5000, 8000, 10000],
+                    index=2,  # Default to 5000ms
+                    help="Audio chunk size in milliseconds. Smaller chunks = faster response, larger chunks = better accuracy"
+                )
+                
+                # Streaming quality info
+                chunk_seconds = chunk_duration / 1000
+                st.sidebar.caption(f"📊 {chunk_seconds}s chunks")
+                
+                # Streaming mode options
+                streaming_mode = st.sidebar.selectbox(
+                    "Streaming Mode",
+                    options=["Real-time Display", "Progressive Chunks", "Batch Streaming"],
+                    index=0,
+                    help="Real-time: Live text updates, Progressive: Chunk-by-chunk results, Batch: All chunks processed"
+                )
+                
+                # Show streaming benefits
+                st.sidebar.success("✅ Faster initial results")
+                st.sidebar.info("📺 Real-time text display")
+                
+                # Language override for streaming
+                streaming_language = st.sidebar.selectbox(
+                    "Language (Optional)",
+                    options=[None, "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"],
+                    index=0,
+                    help="Specify language for better streaming accuracy (leave as None for auto-detection)"
+                )
+            else:
+                # Default values when streaming is disabled
+                chunk_duration = 5000
+                streaming_mode = "Real-time Display"
+                streaming_language = None
+        else:
+            st.sidebar.warning("⚠️ Streaming requires OpenAI package")
+            st.sidebar.caption("Install: pip install openai>=1.3.0")
+            enable_streaming = False
+            chunk_duration = 5000
+            streaming_mode = "Real-time Display"  
+            streaming_language = None
+        
         # Processing mode selection
         st.subheader("🎚️ Processing Mode")
         processing_mode = st.radio(
@@ -303,72 +363,214 @@ def main():
                             for rec in analysis['recommendations']:
                                 st.write(f"• {rec}")
                 
-                # Transcribe button
-                if st.button("🎯 Transcribe Audio", type="primary"):
-                    with st.spinner(f"Transcribing audio using {model_name}..."):
-                        # Read audio bytes
-                        uploaded_file.seek(0)  # Reset file pointer to beginning
-                        audio_bytes = uploaded_file.read()
-                        
-                        if not audio_bytes:
-                            st.error("No audio data found. Please try uploading the file again.")
-                            return
-                        
-                        # Perform transcription with advanced format control
+                # Transcribe button - change text based on streaming mode
+                transcribe_button_text = "� Stream Transcription" if enable_streaming else "�🎯 Transcribe Audio"
+                
+                if st.button(transcribe_button_text, type="primary"):
+                    # Read audio bytes
+                    uploaded_file.seek(0)  # Reset file pointer to beginning
+                    audio_bytes = uploaded_file.read()
+                    
+                    if not audio_bytes:
+                        st.error("No audio data found. Please try uploading the file again.")
+                        return
+                    
+                    # Choose transcription method based on streaming mode
+                    if enable_streaming and is_streaming_available():
+                        # Streaming transcription
                         try:
-                            # Start timing the Clarifai API call
-                            start_time = time.time()
+                            from ClarifaiUtil import create_streaming_transcriber
                             
-                            transcription, processed_audio, audio_analysis = transcriber.transcribe_with_format_control(
-                                audio_bytes, 
-                                model_name, 
-                                temperature, 
-                                max_tokens,
-                                api_format=api_format,
+                            streaming_transcriber = create_streaming_transcriber(config.CLARIFAI_PAT)
+                            
+                            # Create containers for real-time updates
+                            st.info(f"🌊 Starting streaming transcription with {model_name}")
+                            st.info(f"📊 Chunk size: {chunk_duration/1000:.1f}s | Mode: {streaming_mode}")
+                            
+                            # Real-time display containers
+                            if streaming_mode == "Real-time Display":
+                                current_text_container = st.empty()
+                                progress_container = st.empty()
+                                chunk_info_container = st.empty()
+                            
+                            # Start streaming transcription
+                            start_time = time.time()
+                            streaming_results = []
+                            current_text = ""
+                            
+                            # Progress callback for real-time updates
+                            def update_progress(result):
+                                nonlocal current_text, streaming_results
+                                streaming_results.append(result)
+                                
+                                if streaming_mode == "Real-time Display" and result.get("text"):
+                                    current_text = result.get("cumulative_text", "")
+                                    
+                                    # Update containers
+                                    current_text_container.text_area(
+                                        "🌊 Live Transcription", 
+                                        value=current_text,
+                                        height=100,
+                                        key=f"live_text_{len(streaming_results)}"
+                                    )
+                                    
+                                    chunk_idx = result.get("chunk_index", 0)
+                                    processing_time = result.get("processing_time", 0)
+                                    
+                                    progress_container.info(
+                                        f"📊 Chunk {chunk_idx + 1} • "
+                                        f"Processed: {processing_time:.2f}s • "
+                                        f"Characters: {len(current_text)}"
+                                    )
+                            
+                            # Execute streaming transcription with quality settings
+                            final_result = streaming_transcriber.transcribe_streaming_realtime(
+                                audio_bytes,
+                                model_name=model_name,
+                                progress_callback=update_progress if streaming_mode == "Real-time Display" else None,
+                                chunk_duration_ms=chunk_duration,
+                                language=streaming_language,
+                                enable_audio_analysis=True,  # Always enable for streaming insights
                                 high_quality_conversion=high_quality_conversion,
-                                target_sample_rate=target_sample_rate,
-                                normalize_audio=normalize_audio,
-                                trim_silence=trim_silence,
-                                noise_reduce=noise_reduce,
-                                gain_db=gain_db
+                                target_sample_rate=target_sample_rate
                             )
                             
-                            # Calculate API call duration
-                            end_time = time.time()
-                            api_duration = end_time - start_time
+                            total_time = time.time() - start_time
                             
-                            # Store result in session state
-                            if transcription:
-                                st.session_state.transcription = transcription
+                            # Store streaming results
+                            if final_result and final_result.get("text"):
+                                st.session_state.transcription = final_result["text"]
                                 st.session_state.model_used = model_name
-                                st.session_state.converted_wav = processed_audio  # Store processed audio
                                 st.session_state.original_filename = uploaded_file.name
-                                st.session_state.api_duration = api_duration  # Store API timing
-                                st.session_state.api_format = api_format  # Store API format used
-                                st.session_state.audio_analysis = audio_analysis  # Store audio analysis
-                                st.session_state.audio_timestamp = time.time()  # Track when audio was created
-                                st.success(f"Transcription completed in {api_duration:.2f} seconds using {api_format.upper()} format!")
-                            else:
-                                st.error("Transcription returned empty result.")
+                                st.session_state.api_duration = total_time
+                                st.session_state.streaming_results = streaming_results
+                                st.session_state.streaming_mode = streaming_mode
+                                st.session_state.chunk_duration = chunk_duration
+                                st.session_state.is_streaming = True
+                                st.session_state.audio_timestamp = time.time()
                                 
-                        except TypeError as e:
-                            st.error(f"Data type error: {str(e)}")
-                        except ValueError as e:
-                            st.error(f"Data validation error: {str(e)}")
+                                # Success message with streaming stats
+                                total_chunks = final_result.get("total_chunks", 0)
+                                st.success(
+                                    f"🌊 Streaming completed! "
+                                    f"Total time: {total_time:.2f}s • "
+                                    f"Chunks: {total_chunks} • "
+                                    f"Avg per chunk: {total_time/max(total_chunks, 1):.2f}s"
+                                )
+                            else:
+                                st.error("Streaming transcription returned empty result.")
+                                
+                        except ImportError:
+                            st.error("⚠️ Streaming requires OpenAI package. Install with: pip install openai>=1.3.0")
                         except Exception as e:
-                            st.error(f"Transcription failed: {str(e)}")
+                            st.error(f"Streaming transcription failed: {str(e)}")
+                    
+                    else:
+                        # Regular transcription
+                        with st.spinner(f"Transcribing audio using {model_name}..."):
+                            try:
+                                # Start timing the Clarifai API call
+                                start_time = time.time()
+                                
+                                transcription, processed_audio, audio_analysis = transcriber.transcribe_with_format_control(
+                                    audio_bytes, 
+                                    model_name, 
+                                    temperature, 
+                                    max_tokens,
+                                    api_format=api_format,
+                                    high_quality_conversion=high_quality_conversion,
+                                    target_sample_rate=target_sample_rate,
+                                    normalize_audio=normalize_audio,
+                                    trim_silence=trim_silence,
+                                    noise_reduce=noise_reduce,
+                                    gain_db=gain_db
+                                )
+                                
+                                # Calculate API call duration
+                                end_time = time.time()
+                                api_duration = end_time - start_time
+                                
+                                # Store result in session state
+                                if transcription:
+                                    st.session_state.transcription = transcription
+                                    st.session_state.model_used = model_name
+                                    st.session_state.converted_wav = processed_audio  # Store processed audio
+                                    st.session_state.original_filename = uploaded_file.name
+                                    st.session_state.api_duration = api_duration  # Store API timing
+                                    st.session_state.api_format = api_format  # Store API format used
+                                    st.session_state.audio_analysis = audio_analysis  # Store audio analysis
+                                    st.session_state.is_streaming = False
+                                    st.session_state.audio_timestamp = time.time()  # Track when audio was created
+                                    st.success(f"Transcription completed in {api_duration:.2f} seconds using {api_format.upper()} format!")
+                                else:
+                                    st.error("Transcription returned empty result.")
+                                    
+                            except TypeError as e:
+                                st.error(f"Data type error: {str(e)}")
+                            except ValueError as e:
+                                st.error(f"Data validation error: {str(e)}")
+                            except Exception as e:
+                                st.error(f"Transcription failed: {str(e)}")
         
             with col2:
                 st.header("Transcription Result")
                 
                 if hasattr(st.session_state, 'transcription'):
                     # Model and format info
-                    model_info_col1, model_info_col2 = st.columns([2, 1])
-                    with model_info_col1:
-                        st.subheader(f"Model Used: {st.session_state.model_used}")
-                    with model_info_col2:
-                        api_format_used = getattr(st.session_state, 'api_format', 'wav')
-                        st.subheader(f"Format: {api_format_used.upper()}")
+                    is_streaming = getattr(st.session_state, 'is_streaming', False)
+                    
+                    if is_streaming:
+                        # Streaming results header
+                        model_info_col1, model_info_col2 = st.columns([2, 1])
+                        with model_info_col1:
+                            st.subheader(f"🌊 Streaming Model: {st.session_state.model_used}")
+                        with model_info_col2:
+                            streaming_mode_used = getattr(st.session_state, 'streaming_mode', 'Real-time Display')
+                            st.subheader(f"Mode: {streaming_mode_used}")
+                        
+                        # Streaming statistics
+                        if hasattr(st.session_state, 'streaming_results'):
+                            streaming_results = st.session_state.streaming_results
+                            chunk_duration = getattr(st.session_state, 'chunk_duration', 5000) / 1000
+                            
+                            stream_col1, stream_col2, stream_col3, stream_col4 = st.columns(4)
+                            
+                            with stream_col1:
+                                total_chunks = len([r for r in streaming_results if not r.get('is_final', False)])
+                                st.metric("Total Chunks", total_chunks)
+                            
+                            with stream_col2:
+                                st.metric("Chunk Size", f"{chunk_duration:.1f}s")
+                            
+                            with stream_col3:
+                                total_time = getattr(st.session_state, 'api_duration', 0)
+                                st.metric("Total Time", f"{total_time:.2f}s")
+                            
+                            with stream_col4:
+                                avg_time = total_time / max(total_chunks, 1)
+                                st.metric("Avg/Chunk", f"{avg_time:.2f}s")
+                            
+                            # Streaming details expander
+                            with st.expander("🌊 Streaming Details", expanded=False):
+                                st.markdown("**Processing Timeline:**")
+                                
+                                for i, result in enumerate(streaming_results):
+                                    if not result.get('is_final', False):
+                                        chunk_text = result.get('text', '')
+                                        processing_time = result.get('processing_time', 0)
+                                        
+                                        if chunk_text:
+                                            st.markdown(f"**Chunk {i+1}** ({processing_time:.2f}s): {chunk_text}")
+                                        else:
+                                            st.markdown(f"**Chunk {i+1}** ({processing_time:.2f}s): *No text*")
+                    else:
+                        # Regular transcription header
+                        model_info_col1, model_info_col2 = st.columns([2, 1])
+                        with model_info_col1:
+                            st.subheader(f"Model Used: {st.session_state.model_used}")
+                        with model_info_col2:
+                            api_format_used = getattr(st.session_state, 'api_format', 'original')
+                            st.subheader(f"Format: {api_format_used.upper()}")
                 
                     # Show audio analysis if available
                     if hasattr(st.session_state, 'audio_analysis') and st.session_state.audio_analysis and "error" not in st.session_state.audio_analysis:
@@ -393,7 +595,7 @@ def main():
                 
                     # Audio playback section
                     if hasattr(st.session_state, 'converted_wav') and st.session_state.converted_wav:
-                        format_used = getattr(st.session_state, 'api_format', 'wav').upper()
+                        format_used = getattr(st.session_state, 'api_format', 'original').upper()
                         st.subheader(f"🎵 Processed Audio ({format_used})")
                         st.caption(f"This is the {format_used.lower()}-formatted audio that was sent to the AI model")
                     
@@ -421,7 +623,7 @@ def main():
                         # Show audio info
                         original_name = getattr(st.session_state, 'original_filename', 'unknown')
                         processed_size_kb = len(st.session_state.converted_wav) / 1024
-                        format_used = getattr(st.session_state, 'api_format', 'wav')
+                        format_used = getattr(st.session_state, 'api_format', 'original')
                         st.caption(f"📁 Original: {original_name} → Processed {format_used.upper()}: {processed_size_kb:.1f} KB")
                         
                         # Download button for processed audio
