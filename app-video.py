@@ -700,16 +700,7 @@ Frames Analyzed: {result.get('frames_processed', 0)}
             - Identifies text, graphics, and visual elements
             - Provides detailed narrative description of video content
             
-            🤖 **DEMO V5 Verified Models** (Modern Clarifai SDK)
-            - **MM-Poly-8B**: 🌟 **DEFAULT** - Clarifai's native multimodal AI assistant optimized for performance
-            - **Qwen2.5-VL-7B-Instruct**: � Advanced vision-language with temporal understanding and object localization
-            - **MiniCPM-o-2.6**: � Comprehensive multimedia analysis with end-to-end processing
-            
-            ⚡ **DEMO V5 Performance Features**
-            - **FFmpeg Audio Extraction**: 60-70% faster than MoviePy baseline
-            - **Dual Processing System**: FFmpeg primary + MoviePy fallback for reliability
-            - **Real-Time Metrics**: Live processing statistics and performance monitoring
-            - **Professional Interface**: Clean tabbed results with dedicated content sections
+
             
             📊 **Supported Formats**
             """)
