@@ -118,17 +118,6 @@ def main():
                 for feature in features[:3]:  # Show first 3 features
                     feature_display = feature.replace('_', ' ').title()
                     st.sidebar.markdown(f"• {feature_display}")
-                
-                if len(features) > 3:
-                    with st.sidebar.expander(f"View all {len(features)} capabilities"):
-                        for feature in features:
-                            feature_display = feature.replace('_', ' ').title()
-                            st.sidebar.markdown(f"• {feature_display}")
-            
-            # Show pricing if available
-            pricing = model_info.get('pricing')
-            if pricing:
-                st.sidebar.markdown(f"**💰 Pricing:** {pricing}")
         
         # Model recommendations
         if model_name == "MM-Poly-8B":
