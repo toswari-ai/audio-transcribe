@@ -32,7 +32,7 @@ class Config:
         
         # Default Model Settings
         self.DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "OpenAI Whisper Large V3")
-        self.DEFAULT_VIDEO_MODEL = os.getenv("DEFAULT_VIDEO_MODEL", "Qwen2.5-VL-7B-Instruct")
+        self.DEFAULT_VIDEO_MODEL = os.getenv("DEFAULT_VIDEO_MODEL", "MM-Poly-8B")  # Updated to valid native model
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.7"))
         self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "1000"))
         
@@ -106,31 +106,63 @@ class Config:
             }
         }
         
-        # Video Model configurations for multimodal video transcription
+        # Video Model configurations for multimodal video transcription (Updated with valid models)
         self.AVAILABLE_VIDEO_MODELS = {
-            "MM-Poly-8B": {
-                "model_id": "mm-poly-8b",
-                "user_id": "clarifai",
-                "app_id": "main",
-                "description": "Clarifai's multimodal AI assistant that processes text, images, audio, and video. Designed to be helpful, friendly, and respectful in all interactions - Native Clarifai model",
-                "status": "working",
-                "features": ["multimodal_analysis", "natural_language_processing", "learning_ability", "customization", "native_clarifai"],
-                "pricing": "$0.65803 / 1M Input Tokens, $1.11028 / 1M Output Tokens"
-            },
             "Qwen2.5-VL-7B-Instruct": {
                 "model_id": "Qwen2_5-VL-7B-Instruct",
                 "user_id": "qwen",
                 "app_id": "qwen-VL",
-                "description": "Advanced vision-language model for AI agents, finance, and commerce. Excels in visual recognition, long video analysis, and structured data extraction - Latest Qwen2.5 generation",
+                "description": "🌟 Advanced vision-language model with long video analysis and temporal understanding",
                 "status": "working",
                 "features": ["long_video_analysis", "visual_agent", "structured_extraction", "object_localization", "temporal_understanding"],
                 "pricing": "$0.44472 / 1M Input Tokens, $1.32414 / 1M Output Tokens"
             },
-            "MiniCPM-o-2.6 Language": {
+            "MM-Poly-8B": {
+                "model_id": "mm-poly-8b",
+                "user_id": "clarifai",
+                "app_id": "main",
+                "description": "🔧 Clarifai's native multimodal AI assistant - optimized for video, image, and audio analysis",
+                "status": "working",
+                "features": ["multimodal_analysis", "natural_language_processing", "learning_ability", "customization", "native_clarifai"],
+                "pricing": "$0.65803 / 1M Input Tokens, $1.11028 / 1M Output Tokens"
+            },
+            "GPT-4o Mini": {
+                "model_id": "gpt-4o-mini",
+                "user_id": "openai",
+                "app_id": "chat-completion",
+                "description": "Cost-effective, excellent for both modes",
+                "status": "working",
+                "features": ["cost_effective", "multimodal", "fast_processing"]
+            },
+            "Claude 3.5 Sonnet": {
+                "model_id": "claude-3_5-sonnet",
+                "user_id": "anthropic",
+                "app_id": "completion",
+                "description": "Superior reasoning and visual analysis",
+                "status": "working",
+                "features": ["superior_reasoning", "visual_analysis", "high_quality"]
+            },
+            "GPT-4o": {
+                "model_id": "gpt-4o",
+                "user_id": "openai",
+                "app_id": "chat-completion",
+                "description": "Best overall multimodal performance",
+                "status": "working",
+                "features": ["best_performance", "multimodal", "comprehensive_analysis"]
+            },
+            "Gemini 2.0 Flash": {
+                "model_id": "gemini-2_0-flash-exp",
+                "user_id": "google",
+                "app_id": "generate",
+                "description": "Fast processing with good quality",
+                "status": "working",
+                "features": ["fast_processing", "good_quality", "efficient"]
+            },
+            "MiniCPM-o-2.6": {
                 "model_id": "MiniCPM-o-2_6-language",
                 "user_id": "openbmb",
                 "app_id": "miniCPM",
-                "description": "End-side multimodal MLLM taking images, video, text, and audio (10⭐) - Comprehensive multimedia",
+                "description": "Comprehensive multimedia analysis",
                 "status": "working",
                 "features": ["multimedia", "end_to_end", "audio_video_text"]
             }
