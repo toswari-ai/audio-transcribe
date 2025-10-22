@@ -29,7 +29,7 @@ def main():
                     del st.session_state[key]
             st.toast("🧹 Cleaned up expired video files", icon="ℹ️")
     
-    st.title("🎬 Video Transcription Suite - DEMO V5")
+    st.title("🎬 Video Transcription Suite")
     
     # Enhanced header with feature highlights
     st.markdown("""
@@ -92,9 +92,6 @@ def main():
         available_models = video_transcriber.get_available_models()
         model_options = list(available_models.keys())
         default_index = model_options.index(config.DEFAULT_VIDEO_MODEL) if config.DEFAULT_VIDEO_MODEL in model_options else 0
-        
-        # Show available models count
-        st.sidebar.success(f"✅ {len(model_options)} verified models available")
         
         model_name = st.sidebar.selectbox(
             "Choose Video Analysis Model",
