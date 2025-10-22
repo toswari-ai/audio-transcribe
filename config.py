@@ -126,38 +126,6 @@ class Config:
                 "features": ["multimodal_analysis", "natural_language_processing", "learning_ability", "customization", "native_clarifai"],
                 "pricing": "$0.65803 / 1M Input Tokens, $1.11028 / 1M Output Tokens"
             },
-            "GPT-4o Mini": {
-                "model_id": "gpt-4o-mini",
-                "user_id": "openai",
-                "app_id": "chat-completion",
-                "description": "Cost-effective, excellent for both modes",
-                "status": "working",
-                "features": ["cost_effective", "multimodal", "fast_processing"]
-            },
-            "Claude 3.5 Sonnet": {
-                "model_id": "claude-3_5-sonnet",
-                "user_id": "anthropic",
-                "app_id": "completion",
-                "description": "Superior reasoning and visual analysis",
-                "status": "working",
-                "features": ["superior_reasoning", "visual_analysis", "high_quality"]
-            },
-            "GPT-4o": {
-                "model_id": "gpt-4o",
-                "user_id": "openai",
-                "app_id": "chat-completion",
-                "description": "Best overall multimodal performance",
-                "status": "working",
-                "features": ["best_performance", "multimodal", "comprehensive_analysis"]
-            },
-            "Gemini 2.0 Flash": {
-                "model_id": "gemini-2_0-flash-exp",
-                "user_id": "google",
-                "app_id": "generate",
-                "description": "Fast processing with good quality",
-                "status": "working",
-                "features": ["fast_processing", "good_quality", "efficient"]
-            },
             "MiniCPM-o-2.6": {
                 "model_id": "MiniCPM-o-2_6-language",
                 "user_id": "openbmb",
