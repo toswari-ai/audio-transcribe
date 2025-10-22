@@ -166,16 +166,16 @@ def main():
             st.sidebar.subheader("🔧 Advanced Processing")
             
             # Audio Enhancement Options
-            advanced_col1, advanced_col2 = st.sidebar.columns(2)
+            col1, col2 = st.sidebar.columns(2)
             
-            with advanced_col1:
+            with col1:
                 noise_reduce = st.checkbox(
                     "Noise Reduction",
                     value=False,
                     help="Apply basic noise reduction (high-pass filter)"
                 )
                 
-            with advanced_col2:
+            with col2:
                 gain_db = st.slider(
                     "Gain (dB)",
                     min_value=-20.0,
@@ -282,15 +282,15 @@ def main():
                     st.subheader("📊 Audio Quality Analysis")
                     
                     # Quality metrics in columns
-                    qual_col1, qual_col2, qual_col3, qual_col4 = st.columns(4)
+                    col1, col2, col3, col4 = st.columns(4)
                     
-                    with qual_col1:
+                    with col1:
                         st.metric("Duration", f"{analysis['duration_seconds']:.1f}s")
-                    with qual_col2:
+                    with col2:
                         st.metric("Sample Rate", f"{analysis['sample_rate']:,}Hz")
-                    with qual_col3:
+                    with col3:
                         st.metric("Channels", analysis['channels'])
-                    with qual_col4:
+                    with col4:
                         st.metric("Bit Depth", f"{analysis['bit_depth']}-bit")
                     
                     # Overall quality
@@ -363,11 +363,11 @@ def main():
             
             if hasattr(st.session_state, 'transcription'):
                 # Model and format info
-                model_info_col1, model_info_col2 = st.columns([2, 1])
-                with model_info_col1:
+                col1, col2 = st.columns([2, 1])
+                with col1:
                     st.subheader(f"Model Used: {st.session_state.model_used}")
-                with model_info_col2:
-                    api_format_used = getattr(st.session_state, 'api_format', 'wav')
+                with col2:
+                    api_format_used = getattr(st.session_state, 'api_format', 'unknown')
                     st.subheader(f"Format: {api_format_used.upper()}")
                 
                 # Show audio analysis if available
@@ -375,18 +375,18 @@ def main():
                     analysis = st.session_state.audio_analysis
                     
                     with st.expander("📊 Audio Analysis Results", expanded=False):
-                        analysis_col1, analysis_col2, analysis_col3, analysis_col4 = st.columns(4)
+                        col1, col2, col3, col4 = st.columns(4)
                         
-                        with analysis_col1:
+                        with col1:
                             st.metric("Duration", f"{analysis['duration_seconds']:.1f}s")
                             st.metric("Sample Rate", f"{analysis['sample_rate']:,}Hz")
-                        with analysis_col2:
+                        with col2:
                             st.metric("Channels", analysis['channels'])
                             st.metric("Bit Depth", f"{analysis['bit_depth']}-bit")
-                        with analysis_col3:
+                        with col3:
                             st.metric("File Size", f"{analysis['file_size_kb']:.1f}KB")
                             st.metric("Bitrate", f"{analysis['bitrate']:,}bps")
-                        with analysis_col4:
+                        with col4:
                             quality_color = analysis['quality_color']
                             st.markdown(f"**Quality Score:**")
                             st.markdown(f":{quality_color}[{analysis['overall_quality']} ({analysis['quality_score']}/100)]")
@@ -420,11 +420,11 @@ def main():
                     
                     # Show audio info
                     original_name = getattr(st.session_state, 'original_filename', 'unknown')
-                    processed_size_kb = len(st.session_state.converted_wav) / 1024
-                    format_used = getattr(st.session_state, 'api_format', 'wav')
-                    st.caption(f"📁 Original: {original_name} → Processed {format_used.upper()}: {processed_size_kb:.1f} KB")
+                    wav_size_kb = len(st.session_state.converted_wav) / 1024
+                    st.caption(f"📁 Original: {original_name} → Converted WAV: {wav_size_kb:.1f} KB")
                     
                     # Download button for processed audio
+                    format_used = getattr(st.session_state, 'api_format', 'wav')
                     processed_filename = f"processed_{original_name.rsplit('.', 1)[0] if '.' in original_name else original_name}.{format_used}"
                     
                     # Set appropriate MIME type
@@ -488,8 +488,8 @@ def main():
                     st.rerun()
             else:
                 st.info("Upload an audio file and click 'Transcribe Audio' to see results here.")
-        
-        if processing_mode == "Batch Processing":
+            
+        else:  # Batch Processing Mode
             st.header("🗂️ Batch Audio Processing")
             st.markdown("Upload multiple audio files and process them all at once.")
             
@@ -512,16 +512,16 @@ def main():
                     file_size_mb = file.size / (1024 * 1024)
                     total_size += file_size_mb
                     
-                    batch_col1, batch_col2, batch_col3 = st.columns([3, 1, 1])
-                    with batch_col1:
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
                         if file_size_mb <= config.MAX_FILE_SIZE_MB:
                             st.write(f"✅ {file.name}")
                             valid_files.append(file)
                         else:
                             st.write(f"❌ {file.name} (too large)")
-                    with batch_col2:
+                    with col2:
                         st.write(f"{file_size_mb:.1f} MB")
-                    with batch_col3:
+                    with col3:
                         if file_size_mb <= config.MAX_FILE_SIZE_MB:
                             st.write("Ready")
                         else:
@@ -531,9 +531,9 @@ def main():
                 
                 # Batch processing controls
                 if valid_files:
-                    batch_ctrl_col1, batch_ctrl_col2 = st.columns([2, 1])
+                    col1, col2 = st.columns([2, 1])
                     
-                    with batch_ctrl_col1:
+                    with col1:
                         if st.button("🚀 Process All Files", type="primary"):
                             # Initialize batch processing
                             if 'batch_results' not in st.session_state:
@@ -542,6 +542,7 @@ def main():
                             # Process each file
                             progress_bar = st.progress(0)
                             status_text = st.empty()
+                            results_container = st.empty()
                             
                             for i, file in enumerate(valid_files):
                                 status_text.text(f"Processing {file.name} ({i+1}/{len(valid_files)})...")
@@ -552,17 +553,20 @@ def main():
                                     file.seek(0)
                                     audio_bytes = file.read()
                                     
-                                    # Perform transcription using the existing method
+                                    # Perform transcription
                                     start_time = time.time()
-                                    transcription, converted_wav = transcriber.transcribe_audio_with_wav(
+                                    transcription, processed_audio, audio_analysis = transcriber.transcribe_with_format_control(
                                         audio_bytes, 
                                         model_name, 
                                         temperature, 
                                         max_tokens,
+                                        api_format=api_format,
                                         high_quality_conversion=high_quality_conversion,
                                         target_sample_rate=target_sample_rate,
                                         normalize_audio=normalize_audio,
-                                        trim_silence=trim_silence
+                                        trim_silence=trim_silence,
+                                        noise_reduce=noise_reduce,
+                                        gain_db=gain_db
                                     )
                                     end_time = time.time()
                                     
@@ -571,7 +575,9 @@ def main():
                                         'transcription': transcription,
                                         'duration': end_time - start_time,
                                         'success': True,
-                                        'converted_wav': converted_wav
+                                        'audio_analysis': audio_analysis,
+                                        'processed_audio': processed_audio,
+                                        'api_format': api_format
                                     }
                                     
                                 except Exception as e:
@@ -590,7 +596,7 @@ def main():
                             
                             st.success(f"✅ Batch processing complete: {successful} successful, {failed} failed")
                     
-                    with batch_ctrl_col2:
+                    with col2:
                         if st.button("🗑️ Clear Batch"):
                             if 'batch_results' in st.session_state:
                                 del st.session_state.batch_results
@@ -605,12 +611,12 @@ def main():
                     successful_count = sum(1 for r in results.values() if r['success'])
                     total_time = sum(r.get('duration', 0) for r in results.values() if r['success'])
                     
-                    summary_col1, summary_col2, summary_col3 = st.columns(3)
-                    with summary_col1:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
                         st.metric("Files Processed", len(results))
-                    with summary_col2:
+                    with col2:
                         st.metric("Success Rate", f"{(successful_count/len(results)*100):.0f}%")
-                    with summary_col3:
+                    with col3:
                         st.metric("Total Time", f"{total_time:.1f}s")
                     
                     # Individual results
@@ -618,6 +624,7 @@ def main():
                         with st.expander(f"📄 {filename}", expanded=False):
                             if result['success']:
                                 st.write(f"**Status:** ✅ Success ({result['duration']:.2f}s)")
+                                st.write(f"**Format:** {result['api_format'].upper()}")
                                 
                                 # Show transcription
                                 st.text_area(
@@ -628,8 +635,8 @@ def main():
                                 )
                                 
                                 # Download buttons
-                                result_col1, result_col2 = st.columns(2)
-                                with result_col1:
+                                col1, col2 = st.columns(2)
+                                with col1:
                                     st.download_button(
                                         label="📥 Download Text",
                                         data=result['transcription'],
@@ -637,18 +644,24 @@ def main():
                                         mime="text/plain",
                                         key=f"batch_dl_text_{filename}"
                                     )
-                                with result_col2:
-                                    if result.get('converted_wav'):
+                                with col2:
+                                    if result.get('processed_audio'):
+                                        format_ext = result['api_format']
                                         st.download_button(
-                                            label="📥 Download WAV",
-                                            data=result['converted_wav'],
-                                            file_name=f"converted_{filename.rsplit('.', 1)[0]}.wav",
-                                            mime="audio/wav",
+                                            label=f"📥 Download {format_ext.upper()}",
+                                            data=result['processed_audio'],
+                                            file_name=f"processed_{filename.rsplit('.', 1)[0]}.{format_ext}",
+                                            mime=f"audio/{format_ext}",
                                             key=f"batch_dl_audio_{filename}"
                                         )
                             else:
                                 st.write(f"**Status:** ❌ Failed")
                                 st.error(f"Error: {result['error']}")
+                    
+                    # Download all transcriptions as ZIP
+                    if successful_count > 0:
+                        if st.button("📦 Download All Transcriptions"):
+                            st.info("💡 Tip: Use the individual download buttons above to get each transcription file.")
             
             else:
                 st.info("📁 Select multiple audio files to start batch processing.")
