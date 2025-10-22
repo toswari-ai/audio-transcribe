@@ -32,8 +32,17 @@ class Config:
         
         # Default Model Settings
         self.DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "OpenAI Whisper Large V3")
+        self.DEFAULT_VIDEO_MODEL = os.getenv("DEFAULT_VIDEO_MODEL", "Qwen2.5-VL-7B-Instruct")
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.7"))
         self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "1000"))
+        
+        # Video Processing Settings
+        self.MAX_VIDEO_SIZE_MB = int(os.getenv("MAX_VIDEO_SIZE_MB", "100"))  # Larger for videos
+        self.VIDEO_FRAME_EXTRACTION_INTERVAL = int(os.getenv("VIDEO_FRAME_EXTRACTION_INTERVAL", "5"))  # Extract frame every N seconds
+        self.VIDEO_QUALITY_OPTIMIZATION = os.getenv("VIDEO_QUALITY_OPTIMIZATION", "true").lower() == "true"
+        
+        # Debug Settings
+        self.DEBUG_VIDEO_PROCESSING = os.getenv("DEBUG_VIDEO_PROCESSING", "false").lower() == "true"
         
         # Audio Quality Settings
         self.HIGH_QUALITY_CONVERSION = os.getenv("HIGH_QUALITY_CONVERSION", "true").lower() == "true"
@@ -97,8 +106,39 @@ class Config:
             }
         }
         
+        # Video Model configurations for multimodal video transcription
+        self.AVAILABLE_VIDEO_MODELS = {
+            "MM-Poly-8B": {
+                "model_id": "mm-poly-8b",
+                "user_id": "clarifai",
+                "app_id": "main",
+                "description": "Clarifai's multimodal AI assistant that processes text, images, audio, and video. Designed to be helpful, friendly, and respectful in all interactions - Native Clarifai model",
+                "status": "working",
+                "features": ["multimodal_analysis", "natural_language_processing", "learning_ability", "customization", "native_clarifai"],
+                "pricing": "$0.65803 / 1M Input Tokens, $1.11028 / 1M Output Tokens"
+            },
+            "Qwen2.5-VL-7B-Instruct": {
+                "model_id": "Qwen2_5-VL-7B-Instruct",
+                "user_id": "qwen",
+                "app_id": "qwen-VL",
+                "description": "Advanced vision-language model for AI agents, finance, and commerce. Excels in visual recognition, long video analysis, and structured data extraction - Latest Qwen2.5 generation",
+                "status": "working",
+                "features": ["long_video_analysis", "visual_agent", "structured_extraction", "object_localization", "temporal_understanding"],
+                "pricing": "$0.44472 / 1M Input Tokens, $1.32414 / 1M Output Tokens"
+            },
+            "MiniCPM-o-2.6 Language": {
+                "model_id": "MiniCPM-o-2_6-language",
+                "user_id": "openbmb",
+                "app_id": "miniCPM",
+                "description": "End-side multimodal MLLM taking images, video, text, and audio (10⭐) - Comprehensive multimedia",
+                "status": "working",
+                "features": ["multimedia", "end_to_end", "audio_video_text"]
+            }
+        }
+        
         # Supported file formats
         self.SUPPORTED_AUDIO_FORMATS = ['wav', 'mp3', 'flac', 'm4a', 'ogg']
+        self.SUPPORTED_VIDEO_FORMATS = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'm4v']
         
         # Parameter constraints
         self.MIN_TEMPERATURE = 0.0
