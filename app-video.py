@@ -729,49 +729,49 @@ Frames Analyzed: {result.get('frames_processed', 0)}
             cols = st.columns(len(config.SUPPORTED_VIDEO_FORMATS))
             for i, fmt in enumerate(config.SUPPORTED_VIDEO_FORMATS):
                 cols[i].markdown(f"**{fmt.upper()}**")
-    
-    # DEMO V5 Footer Section
-    st.markdown("---")
-    st.markdown("### 🚀 **DEMO V5 Achievements**")
-    
-    # Achievement metrics
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Performance Boost", "60-70%", delta="vs MoviePy")
-    with col2:
-        st.metric("Success Rate", "99.9%", delta="Dual System")
-    with col3:
-        st.metric("Models Available", f"{len(config.AVAILABLE_VIDEO_MODELS)}", delta="Verified Working")
-    with col4:
-        st.metric("Processing Speed", "Real-time", delta="FFmpeg Power")
-    
-    # Feature highlights
-    st.markdown("""
-    **🎯 DEMO V5 Key Features:**
-    - ⚡ **FFmpeg Audio Revolution** - 60-70% performance improvement over MoviePy
-    - 🎨 **Professional Tabbed Interface** - Clean separation of audio and video content
-    - 📊 **Real-Time Performance Metrics** - Live inference timing and processing rates
-    - 🛠️ **Dual Extraction System** - FFmpeg primary + MoviePy fallback for reliability
-    - 🚀 **Enhanced Error Handling** - Comprehensive debugging and recovery systems
-    - 🎯 **Whisper Large V3 Integration** - Dedicated deployment for superior accuracy
-    """)
-    
-    # Technical information
-    with st.expander("🔧 **Technical Information**"):
-        st.markdown("""
-        **DEMO V5 Technical Stack:**
-        - **FFmpeg-python**: High-performance native audio extraction
-        - **MoviePy**: Compatibility fallback system
-        - **Streamlit**: Modern web interface framework
-        - **Clarifai SDK**: Latest multimodal AI integration
-        - **OpenAI Whisper Large V3**: Dedicated audio transcription deployment
         
-        **Performance Benchmarks:**
-        - Audio Processing: 0.3-0.5x real-time (FFmpeg) vs 0.8-1.2x (MoviePy)
-        - Memory Usage: 40% reduction with optimized resource management
-        - Error Rate: <0.1% with comprehensive fallback systems
-        - Compatibility: 99.9% success rate across all video formats
+        # DEMO V5 Footer Section
+        st.markdown("---")
+        st.markdown("### 🚀 **DEMO V5 Achievements**")
+        
+        # Achievement metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Performance Boost", "60-70%", delta="vs MoviePy")
+        with col2:
+            st.metric("Success Rate", "99.9%", delta="Dual System")
+        with col3:
+            st.metric("Models Available", f"{len(config.AVAILABLE_VIDEO_MODELS)}", delta="Verified Working")
+        with col4:
+            st.metric("Processing Speed", "Real-time", delta="FFmpeg Power")
+        
+        # Feature highlights
+        st.markdown("""
+        **🎯 DEMO V5 Key Features:**
+        - ⚡ **FFmpeg Audio Revolution** - 60-70% performance improvement over MoviePy
+        - 🎨 **Professional Tabbed Interface** - Clean separation of audio and video content
+        - 📊 **Real-Time Performance Metrics** - Live inference timing and processing rates
+        - 🛠️ **Dual Extraction System** - FFmpeg primary + MoviePy fallback for reliability
+        - 🚀 **Enhanced Error Handling** - Comprehensive debugging and recovery systems
+        - 🎯 **Whisper Large V3 Integration** - Dedicated deployment for superior accuracy
         """)
+        
+        # Technical information
+        with st.expander("🔧 **Technical Information**"):
+            st.markdown("""
+            **DEMO V5 Technical Stack:**
+            - **FFmpeg-python**: High-performance native audio extraction
+            - **MoviePy**: Compatibility fallback system
+            - **Streamlit**: Modern web interface framework
+            - **Clarifai SDK**: Latest multimodal AI integration
+            - **OpenAI Whisper Large V3**: Dedicated audio transcription deployment
+            
+            **Performance Benchmarks:**
+            - Audio Processing: 0.3-0.5x real-time (FFmpeg) vs 0.8-1.2x (MoviePy)
+            - Memory Usage: 40% reduction with optimized resource management
+            - Error Rate: <0.1% with comprehensive fallback systems
+            - Compatibility: 99.9% success rate across all video formats
+            """)
         
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
