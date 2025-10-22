@@ -358,136 +358,136 @@ def main():
                         except Exception as e:
                             st.error(f"Transcription failed: {str(e)}")
         
-        with col2:
-            st.header("Transcription Result")
-            
-            if hasattr(st.session_state, 'transcription'):
-                # Model and format info
-                model_info_col1, model_info_col2 = st.columns([2, 1])
-                with model_info_col1:
-                    st.subheader(f"Model Used: {st.session_state.model_used}")
-                with model_info_col2:
-                    api_format_used = getattr(st.session_state, 'api_format', 'wav')
-                    st.subheader(f"Format: {api_format_used.upper()}")
+            with col2:
+                st.header("Transcription Result")
                 
-                # Show audio analysis if available
-                if hasattr(st.session_state, 'audio_analysis') and st.session_state.audio_analysis and "error" not in st.session_state.audio_analysis:
-                    analysis = st.session_state.audio_analysis
-                    
-                    with st.expander("📊 Audio Analysis Results", expanded=False):
-                        analysis_col1, analysis_col2, analysis_col3, analysis_col4 = st.columns(4)
+                if hasattr(st.session_state, 'transcription'):
+                    # Model and format info
+                    model_info_col1, model_info_col2 = st.columns([2, 1])
+                    with model_info_col1:
+                        st.subheader(f"Model Used: {st.session_state.model_used}")
+                    with model_info_col2:
+                        api_format_used = getattr(st.session_state, 'api_format', 'wav')
+                        st.subheader(f"Format: {api_format_used.upper()}")
+                
+                    # Show audio analysis if available
+                    if hasattr(st.session_state, 'audio_analysis') and st.session_state.audio_analysis and "error" not in st.session_state.audio_analysis:
+                        analysis = st.session_state.audio_analysis
                         
-                        with analysis_col1:
-                            st.metric("Duration", f"{analysis['duration_seconds']:.1f}s")
-                            st.metric("Sample Rate", f"{analysis['sample_rate']:,}Hz")
-                        with analysis_col2:
-                            st.metric("Channels", analysis['channels'])
-                            st.metric("Bit Depth", f"{analysis['bit_depth']}-bit")
-                        with analysis_col3:
-                            st.metric("File Size", f"{analysis['file_size_kb']:.1f}KB")
-                            st.metric("Bitrate", f"{analysis['bitrate']:,}bps")
-                        with analysis_col4:
-                            quality_color = analysis['quality_color']
-                            st.markdown(f"**Quality Score:**")
-                            st.markdown(f":{quality_color}[{analysis['overall_quality']} ({analysis['quality_score']}/100)]")
-                
-                # Audio playback section
-                if hasattr(st.session_state, 'converted_wav') and st.session_state.converted_wav:
-                    format_used = getattr(st.session_state, 'api_format', 'wav').upper()
-                    st.subheader(f"🎵 Processed Audio ({format_used})")
-                    st.caption(f"This is the {format_used.lower()}-formatted audio that was sent to the AI model")
-                    
-                    # Check if audio is recent (within last 10 minutes to avoid stale references)
-                    audio_age = time.time() - getattr(st.session_state, 'audio_timestamp', 0)
-                    
-                    if audio_age < 600:  # 10 minutes
-                        # Play the converted WAV file with error handling
-                        try:
-                            # Create a fresh BytesIO object for audio playback
-                            audio_buffer = io.BytesIO(st.session_state.converted_wav)
-                            st.audio(audio_buffer, format="audio/wav")
-                        except Exception as e:
-                            st.warning("Audio playback temporarily unavailable. You can still download the converted WAV file below.")
-                            st.caption(f"Audio playback error: {str(e)}")
+                        with st.expander("📊 Audio Analysis Results", expanded=False):
+                            analysis_col1, analysis_col2, analysis_col3, analysis_col4 = st.columns(4)
                             
-                            # Provide refresh option
-                            if st.button("🔄 Refresh Audio", help="Reset audio player"):
-                                st.session_state.audio_timestamp = time.time()
-                                st.rerun()
-                    else:
-                        st.warning("Audio playback expired for performance reasons. You can still download the converted WAV file below.")
-                        st.caption("Re-run transcription to enable audio playback again.")
-                    
-                    # Show audio info
-                    original_name = getattr(st.session_state, 'original_filename', 'unknown')
-                    processed_size_kb = len(st.session_state.converted_wav) / 1024
-                    format_used = getattr(st.session_state, 'api_format', 'wav')
-                    st.caption(f"📁 Original: {original_name} → Processed {format_used.upper()}: {processed_size_kb:.1f} KB")
-                    
-                    # Download button for processed audio
-                    processed_filename = f"processed_{original_name.rsplit('.', 1)[0] if '.' in original_name else original_name}.{format_used}"
-                    
-                    # Set appropriate MIME type
-                    mime_types = {
-                        'wav': 'audio/wav',
-                        'mp3': 'audio/mpeg',
-                        'flac': 'audio/flac', 
-                        'ogg': 'audio/ogg'
-                    }
-                    mime_type = mime_types.get(format_used, 'audio/wav')
-                    
-                    st.download_button(
-                        label=f"📥 Download Processed {format_used.upper()}",
-                        data=st.session_state.converted_wav,
-                        file_name=processed_filename,
-                        mime=mime_type,
-                        help=f"Download the processed {format_used.upper()} file used for transcription"
-                    )
-                    
-                    st.divider()
+                            with analysis_col1:
+                                st.metric("Duration", f"{analysis['duration_seconds']:.1f}s")
+                                st.metric("Sample Rate", f"{analysis['sample_rate']:,}Hz")
+                            with analysis_col2:
+                                st.metric("Channels", analysis['channels'])
+                                st.metric("Bit Depth", f"{analysis['bit_depth']}-bit")
+                            with analysis_col3:
+                                st.metric("File Size", f"{analysis['file_size_kb']:.1f}KB")
+                                st.metric("Bitrate", f"{analysis['bitrate']:,}bps")
+                            with analysis_col4:
+                                quality_color = analysis['quality_color']
+                                st.markdown(f"**Quality Score:**")
+                                st.markdown(f":{quality_color}[{analysis['overall_quality']} ({analysis['quality_score']}/100)]")
                 
-                # Display transcription in a text area for easy copying
-                st.text_area(
-                    "Transcribed Text",
-                    value=st.session_state.transcription,
-                    height=300,
-                    help="You can copy the transcribed text from here"
-                )
-                
-                # Download button and timing info in columns
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    # Download button for transcription
-                    st.download_button(
-                        label="📥 Download Transcription",
-                        data=st.session_state.transcription,
-                        file_name=f"transcription_{st.session_state.model_used.lower().replace(' ', '_')}.txt",
-                        mime="text/plain"
-                    )
-                
-                with col2:
-                    # Display API call timing
-                    if hasattr(st.session_state, 'api_duration'):
-                        st.metric(
-                            label="⏱️ API Time",
-                            value=f"{st.session_state.api_duration:.2f}s",
-                            help="Time taken for the Clarifai API call"
+                    # Audio playback section
+                    if hasattr(st.session_state, 'converted_wav') and st.session_state.converted_wav:
+                        format_used = getattr(st.session_state, 'api_format', 'wav').upper()
+                        st.subheader(f"🎵 Processed Audio ({format_used})")
+                        st.caption(f"This is the {format_used.lower()}-formatted audio that was sent to the AI model")
+                    
+                        # Check if audio is recent (within last 10 minutes to avoid stale references)
+                        audio_age = time.time() - getattr(st.session_state, 'audio_timestamp', 0)
+                        
+                        if audio_age < 600:  # 10 minutes
+                            # Play the converted WAV file with error handling
+                            try:
+                                # Create a fresh BytesIO object for audio playback
+                                audio_buffer = io.BytesIO(st.session_state.converted_wav)
+                                st.audio(audio_buffer, format="audio/wav")
+                            except Exception as e:
+                                st.warning("Audio playback temporarily unavailable. You can still download the converted WAV file below.")
+                                st.caption(f"Audio playback error: {str(e)}")
+                                
+                                # Provide refresh option
+                                if st.button("🔄 Refresh Audio", help="Reset audio player"):
+                                    st.session_state.audio_timestamp = time.time()
+                                    st.rerun()
+                        else:
+                            st.warning("Audio playback expired for performance reasons. You can still download the converted WAV file below.")
+                            st.caption("Re-run transcription to enable audio playback again.")
+                    
+                        # Show audio info
+                        original_name = getattr(st.session_state, 'original_filename', 'unknown')
+                        processed_size_kb = len(st.session_state.converted_wav) / 1024
+                        format_used = getattr(st.session_state, 'api_format', 'wav')
+                        st.caption(f"📁 Original: {original_name} → Processed {format_used.upper()}: {processed_size_kb:.1f} KB")
+                        
+                        # Download button for processed audio
+                        processed_filename = f"processed_{original_name.rsplit('.', 1)[0] if '.' in original_name else original_name}.{format_used}"
+                        
+                        # Set appropriate MIME type
+                        mime_types = {
+                            'wav': 'audio/wav',
+                            'mp3': 'audio/mpeg',
+                            'flac': 'audio/flac', 
+                            'ogg': 'audio/ogg'
+                        }
+                        mime_type = mime_types.get(format_used, 'audio/wav')
+                        
+                        st.download_button(
+                            label=f"📥 Download Processed {format_used.upper()}",
+                            data=st.session_state.converted_wav,
+                            file_name=processed_filename,
+                            mime=mime_type,
+                            help=f"Download the processed {format_used.upper()} file used for transcription"
                         )
+                        
+                        st.divider()
                 
-                # Clear button
-                if st.button("🗑️ Clear Result"):
-                    # Clear all transcription-related session data
-                    keys_to_clear = [
-                        'transcription', 'model_used', 'converted_wav', 'original_filename',
-                        'api_duration', 'audio_timestamp', 'api_format', 'audio_analysis'
-                    ]
-                    for key in keys_to_clear:
-                        if hasattr(st.session_state, key):
-                            delattr(st.session_state, key)
-                    st.rerun()
-            else:
-                st.info("Upload an audio file and click 'Transcribe Audio' to see results here.")
+                    # Display transcription in a text area for easy copying
+                    st.text_area(
+                        "Transcribed Text",
+                        value=st.session_state.transcription,
+                        height=300,
+                        help="You can copy the transcribed text from here"
+                    )
+                    
+                    # Download button and timing info in columns
+                    download_col1, download_col2 = st.columns([2, 1])
+                    
+                    with download_col1:
+                        # Download button for transcription
+                        st.download_button(
+                            label="📥 Download Transcription",
+                            data=st.session_state.transcription,
+                            file_name=f"transcription_{st.session_state.model_used.lower().replace(' ', '_')}.txt",
+                            mime="text/plain"
+                        )
+                    
+                    with download_col2:
+                        # Display API call timing
+                        if hasattr(st.session_state, 'api_duration'):
+                            st.metric(
+                                label="⏱️ API Time",
+                                value=f"{st.session_state.api_duration:.2f}s",
+                                help="Time taken for the Clarifai API call"
+                            )
+                
+                    # Clear button
+                    if st.button("🗑️ Clear Result"):
+                        # Clear all transcription-related session data
+                        keys_to_clear = [
+                            'transcription', 'model_used', 'converted_wav', 'original_filename',
+                            'api_duration', 'audio_timestamp', 'api_format', 'audio_analysis'
+                        ]
+                        for key in keys_to_clear:
+                            if hasattr(st.session_state, key):
+                                delattr(st.session_state, key)
+                        st.rerun()
+                else:
+                    st.info("Upload an audio file and click 'Transcribe Audio' to see results here.")
         
         if processing_mode == "Batch Processing":
             st.header("🗂️ Batch Audio Processing")
